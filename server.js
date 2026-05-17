@@ -1,25 +1,33 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
-const os = require('os');
-const { spawn, execFile } = require('child_process');
+const { spawn } = require('child_process');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// Path to optional cookies file (Netscape format)
-const COOKIES_FILE = path.join(__dirname, 'cookies.txt');
+// Piped API instances — dynamically updated from official registry
+let PIPED_INSTANCES = [
+  'https://api.piped.private.coffee',
+];
 
-// Safely handle cookies via environment variable
-if (process.env.YOUTUBE_COOKIES) {
+// Fetch additional instances from the official Piped registry on startup
+(async function refreshInstances() {
   try {
-    fs.writeFileSync(COOKIES_FILE, process.env.YOUTUBE_COOKIES, 'utf8');
-    console.log('✅ Created cookies.txt from environment variable.');
-  } catch (err) {
-    console.error('❌ Failed to write cookies from environment variable:', err);
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 10000);
+    const res = await fetch('https://piped-instances.kavin.rocks/', { signal: controller.signal });
+    const list = await res.json();
+    const apis = list.filter(i => i.api_url).map(i => i.api_url);
+    if (apis.length > 0) {
+      // Put the known-working one first, then add others
+      PIPED_INSTANCES = ['https://api.piped.private.coffee', ...apis.filter(u => u !== 'https://api.piped.private.coffee')];
+      console.log(`  📡 Loaded ${PIPED_INSTANCES.length} Piped instances`);
+    }
+  } catch (e) {
+    console.log('  ⚠️  Could not refresh Piped instances, using defaults');
   }
-}
+})();
 
 // Middleware
 app.use(cors());
@@ -28,54 +36,64 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+function extractVideoId(url) {
+  const match = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return match ? match[1] : null;
+}
+
+function isValidYouTubeUrl(url) {
+  return extractVideoId(url) !== null;
+}
+
 function sanitizeFilename(name) {
   return name.replace(/[<>:"/\\|?*]+/g, '').replace(/\s+/g, '_').substring(0, 100);
 }
 
-function isValidYouTubeUrl(url) {
-  const pattern = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|shorts\/|embed\/)|youtu\.be\/)/;
-  return pattern.test(url);
+function formatDuration(seconds) {
+  if (!seconds) return '';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-function hasCookiesFile() {
-  return fs.existsSync(COOKIES_FILE);
-}
+// Fetch from Piped API with automatic fallback across instances
+async function fetchFromPiped(videoId) {
+  const errors = [];
 
-// Determine the correct yt-dlp binary path based on platform
-function getYtDlpPath() {
-  const binName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
-  return path.join(__dirname, 'node_modules', 'youtube-dl-exec', 'bin', binName);
-}
+  for (const instance of PIPED_INSTANCES) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
 
-// Build common yt-dlp CLI arguments
-function getBaseArgs() {
-  const args = ['--no-check-certificates', '--no-warnings'];
-  // On Linux (server), use Deno as JS runtime and try alternative YouTube clients
-  if (process.platform !== 'win32') {
-    args.push('--extractor-args', 'youtube:player_client=web_creator,mediaconnect,web');
-  }
-  if (hasCookiesFile()) {
-    args.push('--cookies', COOKIES_FILE);
-  }
-  return args;
-}
+      console.log(`[Piped] Trying ${instance}/streams/${videoId}`);
+      const res = await fetch(`${instance}/streams/${videoId}`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
 
-// Run yt-dlp and return stdout as a promise
-function runYtDlp(args) {
-  return new Promise((resolve, reject) => {
-    const bin = getYtDlpPath();
-    console.log(`[yt-dlp] Running: ${bin} ${args.join(' ')}`);
-
-    execFile(bin, args, { maxBuffer: 50 * 1024 * 1024, timeout: 60000 }, (err, stdout, stderr) => {
-      if (err) {
-        const errorMsg = stderr || err.message || 'Unknown yt-dlp error';
-        console.error(`[yt-dlp] Error: ${errorMsg}`);
-        reject(new Error(errorMsg));
-      } else {
-        resolve(stdout);
+      if (!res.ok) {
+        errors.push(`${instance}: HTTP ${res.status}`);
+        continue;
       }
-    });
-  });
+
+      const data = await res.json();
+      if (data.error) {
+        errors.push(`${instance}: ${data.error}`);
+        continue;
+      }
+
+      console.log(`[Piped] ✅ Success from ${instance} — "${data.title}"`);
+      data._instance = instance;
+      return data;
+    } catch (e) {
+      errors.push(`${instance}: ${e.message}`);
+      continue;
+    }
+  }
+
+  throw new Error(`All Piped instances failed: ${errors.join(' | ')}`);
 }
 
 // ── GET /api/info ────────────────────────────────────────────────────────────
@@ -88,66 +106,39 @@ app.get('/api/info', async (req, res) => {
   }
 
   try {
-    const args = [
-      ...getBaseArgs(),
-      '--dump-single-json',
-      '--no-check-formats',
-      '--skip-download',
-      url,
-    ];
+    const videoId = extractVideoId(url);
+    const data = await fetchFromPiped(videoId);
 
-    const stdout = await runYtDlp(args);
-    const info = JSON.parse(stdout);
-
-    // Build a clean list of downloadable formats
+    // Build format list from Piped streams
     const seen = new Set();
     const formats = [];
 
-    if (info.formats) {
-      // First try combined formats (video+audio in one stream)
-      for (const f of info.formats) {
-        if (f.vcodec && f.vcodec !== 'none' && f.acodec && f.acodec !== 'none') {
-          const key = `${f.height || 0}-combined`;
-          if (!seen.has(key) && f.height) {
-            seen.add(key);
-            formats.push({
-              format_id: f.format_id,
-              quality: `${f.height}p`,
-              height: f.height,
-              ext: f.ext || 'mp4',
-              filesize: f.filesize || f.filesize_approx || null,
-              type: 'combined',
-            });
-          }
-        }
-      }
+    // Video streams
+    if (data.videoStreams) {
+      for (const s of data.videoStreams) {
+        const height = parseInt(s.quality) || 0;
+        if (!height) continue;
 
-      // If no combined formats, show video-only formats (will be merged with audio on download)
-      if (formats.length === 0) {
-        for (const f of info.formats) {
-          if (f.vcodec && f.vcodec !== 'none' && f.height) {
-            const key = `${f.height}-video`;
-            if (!seen.has(key)) {
-              seen.add(key);
-              formats.push({
-                format_id: `${f.format_id}+bestaudio`,
-                quality: `${f.height}p`,
-                height: f.height,
-                ext: 'mp4',
-                filesize: f.filesize || f.filesize_approx || null,
-                type: 'combined',
-              });
-            }
-          }
-        }
+        const key = `${height}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        formats.push({
+          format_id: s.videoOnly ? `merge:${height}` : `direct:${height}`,
+          quality: `${height}p`,
+          height,
+          ext: 'mp4',
+          filesize: s.contentLength ? parseInt(s.contentLength) : null,
+          type: 'combined',
+        });
       }
     }
 
     formats.sort((a, b) => b.height - a.height);
 
-    // "Best" convenience option
+    // "Best Quality" convenience option
     formats.unshift({
-      format_id: 'bestvideo+bestaudio/best',
+      format_id: 'best',
       quality: 'Best Quality',
       height: 9999,
       ext: 'mp4',
@@ -157,7 +148,7 @@ app.get('/api/info', async (req, res) => {
 
     // Audio-only option
     formats.push({
-      format_id: 'bestaudio',
+      format_id: 'audio',
       quality: 'Audio Only',
       height: 0,
       ext: 'mp3',
@@ -166,38 +157,18 @@ app.get('/api/info', async (req, res) => {
     });
 
     res.json({
-      title: info.title,
-      thumbnail: info.thumbnail,
-      duration: info.duration_string || info.duration,
-      channel: info.channel || info.uploader,
-      view_count: info.view_count,
+      title: data.title || 'Untitled',
+      thumbnail: data.thumbnailUrl || '',
+      duration: formatDuration(data.duration),
+      channel: data.uploader || data.uploaderName || 'Unknown',
+      view_count: data.views || 0,
       formats,
     });
   } catch (err) {
-    const msg = (err.message || '').toString();
-    console.error('Info error:', msg);
-
-    if (msg.includes('Sign in') || msg.includes('bot') || msg.includes('cookies')) {
-      if (hasCookiesFile()) {
-        res.status(403).json({
-          error: 'YouTube is blocking requests from this server\'s IP address even with cookies. Try refreshing your cookies (they may have expired) or try a different video.',
-          needsCookies: false,
-        });
-      } else {
-        res.status(403).json({
-          error: 'YouTube requires authentication. Please export your browser cookies to a cookies.txt file and place it in the project root. See the guide below the search bar.',
-          needsCookies: true,
-        });
-      }
-    } else if (msg.includes('Requested format')) {
-      res.status(500).json({
-        error: 'Could not find a downloadable format for this video. The video may be region-restricted or require a different format.',
-      });
-    } else {
-      res.status(500).json({
-        error: `Failed to fetch video info: ${msg.substring(0, 200)}`,
-      });
-    }
+    console.error('Info error:', err.message);
+    res.status(500).json({
+      error: `Failed to fetch video info: ${err.message.substring(0, 300)}`,
+    });
   }
 });
 
@@ -211,75 +182,129 @@ app.get('/api/download', async (req, res) => {
   }
 
   try {
-    // First get video title for the filename
-    const infoArgs = [...getBaseArgs(), '--dump-single-json', '--no-check-formats', '--skip-download', url];
-    const infoStdout = await runYtDlp(infoArgs);
-    const info = JSON.parse(infoStdout);
+    const videoId = extractVideoId(url);
+    const data = await fetchFromPiped(videoId);
+    const safeTitle = sanitizeFilename(data.title || 'video');
 
-    const safeTitle = sanitizeFilename(info.title || 'video');
-    const isAudio = format_id === 'bestaudio';
-    const ext = isAudio ? 'mp3' : 'mp4';
+    // ── Audio-only download ──
+    if (format_id === 'audio') {
+      const audioStream = data.audioStreams
+        ?.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
 
-    const tempFilePath = path.join(os.tmpdir(), `tubegrab_${Date.now()}_${Math.floor(Math.random() * 10000)}.${ext}`);
-    const args = [...getBaseArgs(), url, '-o', tempFilePath];
+      if (!audioStream) {
+        return res.status(500).json({ error: 'No audio stream available.' });
+      }
 
-    if (isAudio) {
-      args.push('-f', 'bestaudio', '-x', '--audio-format', 'mp3');
-    } else if (format_id) {
-      args.push('-f', format_id, '--merge-output-format', 'mp4');
-    } else {
-      args.push('-f', 'bestvideo+bestaudio/best', '--merge-output-format', 'mp4');
-    }
+      const encodedTitle = encodeURIComponent(`${safeTitle}.mp3`);
+      res.setHeader('Content-Disposition', `attachment; filename="audio.mp3"; filename*=UTF-8''${encodedTitle}`);
+      res.setHeader('Content-Type', 'audio/mpeg');
 
-    const ytdlpBin = getYtDlpPath();
-    const subprocess = spawn(ytdlpBin, args);
+      const ffmpeg = spawn('ffmpeg', [
+        '-i', audioStream.url,
+        '-vn', '-acodec', 'libmp3lame', '-ab', '192k',
+        '-f', 'mp3',
+        'pipe:1',
+      ]);
 
-    let stderrData = '';
-    if (subprocess.stderr) {
-      subprocess.stderr.on('data', (chunk) => {
-        stderrData += chunk.toString();
+      ffmpeg.stdout.pipe(res);
+      ffmpeg.stderr.on('data', (d) => { /* suppress ffmpeg progress logs */ });
+      ffmpeg.on('error', (err) => {
+        console.error('FFmpeg error:', err);
+        if (!res.headersSent) res.status(500).json({ error: 'Audio conversion failed.' });
       });
+      req.on('close', () => ffmpeg.kill('SIGTERM'));
+      return;
     }
 
-    subprocess.on('error', (err) => {
-      console.error('Spawn error:', err);
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'Download failed. Please try again.' });
-      }
-    });
+    // ── Video download ──
+    let targetHeight = 0;
+    let needsMerge = false;
 
-    subprocess.on('close', (code) => {
-      if (code === 0) {
-        // Set response headers for file download
-        const encodedTitle = encodeURIComponent(`${safeTitle}.${ext}`);
-        res.setHeader('Content-Disposition', `attachment; filename="video.${ext}"; filename*=UTF-8''${encodedTitle}`);
-        res.setHeader('Content-Type', isAudio ? 'audio/mpeg' : 'video/mp4');
+    if (format_id === 'best') {
+      targetHeight = 99999;
+      needsMerge = true;
+    } else if (format_id?.startsWith('merge:')) {
+      targetHeight = parseInt(format_id.replace('merge:', ''));
+      needsMerge = true;
+    } else if (format_id?.startsWith('direct:')) {
+      targetHeight = parseInt(format_id.replace('direct:', ''));
+      needsMerge = false;
+    }
 
-        const fileStream = fs.createReadStream(tempFilePath);
-        fileStream.pipe(res);
-        
-        fileStream.on('close', () => {
-          fs.unlink(tempFilePath, (err) => {
-            if (err && err.code !== 'ENOENT') console.error('Error deleting temp file:', err);
-          });
-        });
+    // Find the best matching video stream
+    let videoStream;
+    if (data.videoStreams) {
+      const sorted = [...data.videoStreams].sort((a, b) => {
+        return (parseInt(b.quality) || 0) - (parseInt(a.quality) || 0);
+      });
+
+      if (targetHeight >= 99999) {
+        videoStream = sorted[0];
       } else {
-        console.error('yt-dlp exited with code', code, stderrData);
-        if (!res.headersSent) {
-          res.status(500).json({ error: 'Download process failed.' });
-        }
-        fs.unlink(tempFilePath, () => {}); // clean up partial file if any
+        videoStream = sorted.find(s => (parseInt(s.quality) || 0) === targetHeight) || sorted[0];
       }
+    }
+
+    if (!videoStream) {
+      return res.status(500).json({ error: 'No video stream available.' });
+    }
+
+    const encodedTitle = encodeURIComponent(`${safeTitle}.mp4`);
+    res.setHeader('Content-Disposition', `attachment; filename="video.mp4"; filename*=UTF-8''${encodedTitle}`);
+    res.setHeader('Content-Type', 'video/mp4');
+
+    let ffmpegArgs;
+
+    if (videoStream.videoOnly || needsMerge) {
+      // Need to merge video + audio
+      const audioStream = data.audioStreams
+        ?.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+
+      if (audioStream) {
+        ffmpegArgs = [
+          '-i', videoStream.url,
+          '-i', audioStream.url,
+          '-c', 'copy',
+          '-movflags', 'frag_keyframe+empty_moov+faststart',
+          '-f', 'mp4',
+          'pipe:1',
+        ];
+      } else {
+        ffmpegArgs = [
+          '-i', videoStream.url,
+          '-c', 'copy',
+          '-movflags', 'frag_keyframe+empty_moov+faststart',
+          '-f', 'mp4',
+          'pipe:1',
+        ];
+      }
+    } else {
+      // Combined stream — just pipe through
+      ffmpegArgs = [
+        '-i', videoStream.url,
+        '-c', 'copy',
+        '-movflags', 'frag_keyframe+empty_moov+faststart',
+        '-f', 'mp4',
+        'pipe:1',
+      ];
+    }
+
+    console.log(`[Download] Starting FFmpeg for "${data.title}" at ${videoStream.quality}`);
+    const ffmpeg = spawn('ffmpeg', ffmpegArgs);
+
+    ffmpeg.stdout.pipe(res);
+    ffmpeg.stderr.on('data', (d) => { /* suppress ffmpeg progress logs */ });
+    ffmpeg.on('error', (err) => {
+      console.error('FFmpeg error:', err);
+      if (!res.headersSent) res.status(500).json({ error: 'Video processing failed.' });
+    });
+    ffmpeg.on('close', (code) => {
+      if (code !== 0) console.error(`FFmpeg exited with code ${code}`);
     });
 
-    req.on('close', () => {
-      subprocess.kill('SIGTERM');
-      setTimeout(() => {
-        fs.unlink(tempFilePath, () => {});
-      }, 5000);
-    });
+    req.on('close', () => ffmpeg.kill('SIGTERM'));
   } catch (err) {
-    console.error('Download error:', err.message || err);
+    console.error('Download error:', err.message);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Download failed. Please try again.' });
     }
@@ -289,41 +314,38 @@ app.get('/api/download', async (req, res) => {
 // ── GET /api/cookies-status ──────────────────────────────────────────────────
 
 app.get('/api/cookies-status', (req, res) => {
-  res.json({ hasCookies: hasCookiesFile() });
+  // Piped API doesn't need cookies — always show as ready
+  res.json({ hasCookies: true });
 });
 
 // ── GET /api/debug — Diagnostic endpoint ─────────────────────────────────────
 
 app.get('/api/debug', async (req, res) => {
-  const results = { platform: process.platform, nodeVersion: process.version };
+  const results = {
+    platform: process.platform,
+    nodeVersion: process.version,
+    backend: 'Piped API',
+    instances: [],
+  };
 
-  // Check yt-dlp binary
-  const bin = getYtDlpPath();
-  results.ytdlpPath = bin;
-  results.ytdlpExists = fs.existsSync(bin);
-  results.cookiesExists = hasCookiesFile();
+  const testVideoId = 'jNQXAC9IVRw'; // "Me at the zoo"
 
-  // Get yt-dlp version
-  try {
-    const version = await runYtDlp(['--version']);
-    results.ytdlpVersion = version.trim();
-  } catch (e) {
-    results.ytdlpVersion = `ERROR: ${e.message}`;
-  }
-
-  // Test with a known public video
-  const testUrl = 'https://www.youtube.com/watch?v=jNQXAC9IVRw';
-  try {
-    const args = [...getBaseArgs(), '--dump-single-json', '--no-check-formats', '--skip-download', testUrl];
-    const stdout = await runYtDlp(args);
-    const info = JSON.parse(stdout);
-    results.testVideo = {
-      success: true,
-      title: info.title,
-      formatCount: info.formats ? info.formats.length : 0,
-    };
-  } catch (e) {
-    results.testVideo = { success: false, error: e.message.substring(0, 500) };
+  for (const instance of PIPED_INSTANCES) {
+    const test = { instance, success: false };
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      const r = await fetch(`${instance}/streams/${testVideoId}`, { signal: controller.signal });
+      clearTimeout(timeout);
+      const d = await r.json();
+      test.success = !d.error;
+      test.title = d.title || d.error || 'unknown';
+      test.videoStreams = d.videoStreams?.length || 0;
+      test.audioStreams = d.audioStreams?.length || 0;
+    } catch (e) {
+      test.error = e.message;
+    }
+    results.instances.push(test);
   }
 
   res.json(results);
@@ -334,11 +356,6 @@ app.get('/api/debug', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`\n  🚀 YouTube Downloader server running at:`);
   console.log(`     http://localhost:${PORT}`);
-  if (hasCookiesFile()) {
-    console.log(`  🍪 cookies.txt found — authentication enabled.`);
-  } else {
-    console.log(`  ⚠️  No cookies.txt found — some videos may require it.`);
-    console.log(`     Place a Netscape-format cookies.txt in the project root.`);
-  }
+  console.log(`  🔧 Backend: Piped API (no yt-dlp, no cookies needed)`);
   console.log('');
 });
