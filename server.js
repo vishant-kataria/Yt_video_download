@@ -6,10 +6,20 @@ const os = require('os');
 const youtubedl = require('youtube-dl-exec');
 
 const app = express();
-const PORT = 4000;
+const PORT = process.env.PORT || 4000;
 
 // Path to optional cookies file (Netscape format)
 const COOKIES_FILE = path.join(__dirname, 'cookies.txt');
+
+// Safely handle cookies via environment variable
+if (process.env.YOUTUBE_COOKIES) {
+  try {
+    fs.writeFileSync(COOKIES_FILE, process.env.YOUTUBE_COOKIES, 'utf8');
+    console.log('✅ Created cookies.txt from environment variable.');
+  } catch (err) {
+    console.error('❌ Failed to write cookies from environment variable:', err);
+  }
+}
 
 // Middleware
 app.use(cors());
