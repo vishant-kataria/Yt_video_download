@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TubeGrab — YouTube Video Downloader</title>
+  <meta name="description" content="Download YouTube videos in high quality for free. Choose from multiple resolutions including 1080p, 720p, and audio-only formats." />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Animated background blobs -->
+  <div class="bg-blobs" aria-hidden="true">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+
+  <main class="app-container">
+    <!-- Header / Brand -->
+    <header class="header" id="header">
+      <div class="logo">
+        <div class="logo-icon">
+          <i data-lucide="download-cloud"></i>
+        </div>
+        <h1 class="logo-text">Tube<span>Grab</span></h1>
+      </div>
+      <p class="tagline">Download YouTube videos in stunning quality — completely free.</p>
+      <div id="cookies-badge" class="cookies-badge hidden"></div>
+    </header>
+
+    <!-- Search Section -->
+    <section class="search-section" id="search-section">
+      <div class="glass-card search-card">
+        <div class="input-wrapper" id="input-wrapper">
+          <div class="input-icon">
+            <i data-lucide="link"></i>
+          </div>
+          <input
+            type="url"
+            id="url-input"
+            class="url-input"
+            placeholder="Paste YouTube link here..."
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button id="fetch-btn" class="fetch-btn" type="button">
+            <i data-lucide="search"></i>
+            <span>Fetch</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cookie Guide State -->
+    <section class="cookie-guide hidden" id="cookie-guide">
+      <div class="glass-card guide-card">
+        <h3><i data-lucide="info"></i> How to fix authentication</h3>
+        <p>YouTube requires authentication. To download videos, you need to provide a `cookies.txt` file.</p>
+        <ol>
+          <li>Install the "Get cookies.txt LOCALLY" extension in your browser (Chrome/Edge).</li>
+          <li>Go to youtube.com and log in.</li>
+          <li>Click the extension icon and click "Export".</li>
+          <li>Save the file as <code>cookies.txt</code> in the project root folder.</li>
+          <li>Restart the server.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- Loading State -->
+    <section class="loading-section hidden" id="loading-section">
+      <div class="glass-card loading-card">
+        <div class="loader">
+          <div class="loader-ring"></div>
+          <div class="loader-ring"></div>
+          <div class="loader-ring"></div>
+        </div>
+        <p class="loading-text">Fetching video info<span class="dots"></span></p>
+      </div>
+    </section>
+
+    <!-- Error State -->
+    <section class="error-section hidden" id="error-section">
+      <div class="glass-card error-card">
+        <div class="error-icon">
+          <i data-lucide="alert-triangle"></i>
+        </div>
+        <p class="error-text" id="error-text">Something went wrong.</p>
+        <button id="retry-btn" class="retry-btn" type="button">
+          <i data-lucide="refresh-cw"></i>
+          <span>Try Again</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Results Section -->
+    <section class="results-section hidden" id="results-section">
+      <div class="glass-card results-card">
+        <!-- Video Preview -->
+        <div class="video-preview" id="video-preview">
+          <div class="thumbnail-wrapper">
+            <img id="video-thumbnail" src="" alt="Video thumbnail" class="thumbnail" />
+            <div class="duration-badge" id="duration-badge"></div>
+          </div>
+          <div class="video-meta">
+            <h2 class="video-title" id="video-title"></h2>
+            <div class="video-stats">
+              <span class="stat" id="video-channel">
+                <i data-lucide="user"></i>
+                <span></span>
+              </span>
+              <span class="stat" id="video-views">
+                <i data-lucide="eye"></i>
+                <span></span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Divider -->
+        <div class="divider"></div>
+
+        <!-- Download Options -->
+        <div class="download-section">
+          <h3 class="download-heading">
+            <i data-lucide="download"></i>
+            Choose Quality
+          </h3>
+          <div class="formats-grid" id="formats-grid">
+            <!-- Format buttons will be inserted by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- New Search -->
+      <button id="new-search-btn" class="new-search-btn" type="button">
+        <i data-lucide="plus-circle"></i>
+        <span>Download Another Video</span>
+      </button>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>Built with <span class="heart">♥</span> — For educational purposes only.</p>
+    </footer>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
