@@ -50,9 +50,9 @@ function getYtDlpPath() {
 // Build common yt-dlp CLI arguments
 function getBaseArgs() {
   const args = ['--no-check-certificates', '--no-warnings'];
-  // Enable Node.js as JS runtime for YouTube extraction on Linux
+  // On Linux (server), use Deno as JS runtime and try alternative YouTube clients
   if (process.platform !== 'win32') {
-    args.push('--js-runtimes', 'nodejs');
+    args.push('--extractor-args', 'youtube:player_client=web_creator,mediaconnect,web');
   }
   if (hasCookiesFile()) {
     args.push('--cookies', COOKIES_FILE);
