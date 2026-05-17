@@ -137,10 +137,22 @@ app.get('/api/info', async (req, res) => {
     const msg = (err.message || err.stderr || '').toString();
     console.error('Info error:', msg);
 
-    if (msg.includes('Sign in') || msg.includes('bot')) {
-      res.status(403).json({
-        error: 'YouTube requires authentication. Please export your browser cookies to a cookies.txt file and place it in the project root. See the guide below the search bar.',
-        needsCookies: true,
+    if (msg.includes('Sign in') || msg.includes('bot') || msg.includes('cookies')) {
+      if (hasCookiesFile()) {
+        // Cookies exist but YouTube still blocks — data center IP issue
+        res.status(403).json({
+          error: 'YouTube is blocking requests from this server\'s IP address even with cookies. Try refreshing your cookies (they may have expired) or try a different video.',
+          needsCookies: false,
+        });
+      } else {
+        res.status(403).json({
+          error: 'YouTube requires authentication. Please export your browser cookies to a cookies.txt file and place it in the project root. See the guide below the search bar.',
+          needsCookies: true,
+        });
+      }
+    } else if (msg.includes('Requested format')) {
+      res.status(500).json({
+        error: 'Could not find a downloadable format for this video. The video may be region-restricted or require a different format.',
       });
     } else {
       res.status(500).json({
