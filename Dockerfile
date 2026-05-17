@@ -11,6 +11,7 @@ COPY package*.json ./
 
 # Install dependencies
 RUN npm install
+RUN ./node_modules/youtube-dl-exec/bin/yt-dlp --update-to nightly
 
 # Copy application code
 COPY . .
