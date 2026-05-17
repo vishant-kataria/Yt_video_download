@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:22-alpine
 
 # Install FFmpeg, Python, and curl (required by yt-dlp)
 RUN apk add --no-cache ffmpeg python3 curl
