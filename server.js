@@ -41,12 +41,22 @@ function hasCookiesFile() {
   return fs.existsSync(COOKIES_FILE);
 }
 
+// Determine the correct yt-dlp binary path based on platform
+function getYtDlpPath() {
+  const binName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
+  return path.join(__dirname, 'node_modules', 'youtube-dl-exec', 'bin', binName);
+}
+
 // Build common yt-dlp options, with cookies if available
 function getBaseOptions() {
   const opts = {
     noCheckCertificates: true,
     noWarnings: true,
   };
+  // Enable Node.js as JS runtime for YouTube extraction
+  if (process.platform !== 'win32') {
+    opts.jsRuntimes = 'nodejs';
+  }
   if (hasCookiesFile()) {
     opts.cookies = COOKIES_FILE;
   }
@@ -66,7 +76,6 @@ app.get('/api/info', async (req, res) => {
     const opts = {
       ...getBaseOptions(),
       dumpSingleJson: true,
-      preferFreeFormats: true,
     };
 
     const info = await youtubedl(url, opts);
@@ -171,11 +180,16 @@ app.get('/api/download', async (req, res) => {
 
     args.push('--no-check-certificates', '--no-warnings');
 
+    // Enable Node.js as JS runtime on Linux
+    if (process.platform !== 'win32') {
+      args.push('--js-runtimes', 'nodejs');
+    }
+
     if (hasCookiesFile()) {
       args.push('--cookies', COOKIES_FILE);
     }
 
-    const ytdlpBin = path.join(__dirname, 'node_modules', 'youtube-dl-exec', 'bin', 'yt-dlp.exe');
+    const ytdlpBin = getYtDlpPath();
     const subprocess = require('child_process').spawn(ytdlpBin, args);
 
     let stderrData = '';
