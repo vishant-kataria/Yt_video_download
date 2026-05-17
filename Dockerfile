@@ -9,11 +9,12 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install dependencies (skip postinstall to avoid GitHub API rate limits)
+RUN npm install --ignore-scripts
 
 # Download the latest yt-dlp nightly binary for Linux
-RUN curl -L https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp -o ./node_modules/youtube-dl-exec/bin/yt-dlp \
+RUN mkdir -p ./node_modules/youtube-dl-exec/bin \
+    && curl -L https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp -o ./node_modules/youtube-dl-exec/bin/yt-dlp \
     && chmod +x ./node_modules/youtube-dl-exec/bin/yt-dlp
 
 # Copy application code
