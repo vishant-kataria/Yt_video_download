@@ -1,14 +1,14 @@
 FROM node:22-alpine
 
-# Install FFmpeg, Python (for yt-dlp), curl, and wireguard tools
+# Install FFmpeg, Python (for yt-dlp), and curl
 RUN apk add --no-cache ffmpeg python3 curl
 
 # Download wgcf (generates Cloudflare WARP WireGuard config)
-RUN curl -L https://github.com/ViRb3/wgcf/releases/download/v2.2.22/wgcf_2.2.22_linux_amd64 -o /usr/local/bin/wgcf \
+RUN curl -L https://github.com/ViRb3/wgcf/releases/download/v2.2.9/wgcf_2.2.9_linux_amd64 -o /usr/local/bin/wgcf \
     && chmod +x /usr/local/bin/wgcf
 
-# Download wireproxy (userspace WireGuard that exposes SOCKS5 proxy - no root needed)
-RUN curl -L https://github.com/pufferffish/wireproxy/releases/download/v1.0.9/wireproxy_linux_amd64.tar.gz -o /tmp/wireproxy.tar.gz \
+# Download wireproxy (userspace WireGuard → SOCKS5 proxy, no root needed)
+RUN curl -L https://github.com/pufferffish/wireproxy/releases/download/v1.1.2/wireproxy_linux_amd64.tar.gz -o /tmp/wireproxy.tar.gz \
     && tar -xzf /tmp/wireproxy.tar.gz -C /usr/local/bin/ \
     && chmod +x /usr/local/bin/wireproxy \
     && rm /tmp/wireproxy.tar.gz
@@ -23,7 +23,9 @@ RUN mkdir -p ./node_modules/youtube-dl-exec/bin \
     && chmod +x ./node_modules/youtube-dl-exec/bin/yt-dlp
 
 COPY . .
-RUN chmod +x /app/start.sh
+
+# Fix Windows CRLF line endings and make start.sh executable
+RUN sed -i 's/\r$//' /app/start.sh && chmod +x /app/start.sh
 
 EXPOSE 4000
 CMD ["/app/start.sh"]
