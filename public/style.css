@@ -44,7 +44,100 @@ body{font-family:'Inter',sans-serif;background:var(--bg-primary);color:var(--tex
 .logo-icon{width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:var(--accent-gradient);border-radius:var(--radius-md);color:#fff;box-shadow:var(--accent-glow)}
 .logo-icon svg{width:26px;height:26px}
 .logo-text{font-size:2.2rem;font-weight:800;letter-spacing:-.03em}
-.logo-text span{background:var(--accent-gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.logo-text span {
+  color: var(--primary);
+}
+
+.cookies-badge {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+.cookies-ok {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--success);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+.cookies-missing {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.cookie-guide {
+  max-width: 800px;
+  margin: 0 auto 3rem;
+  padding: 0 1rem;
+}
+.guide-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+.guide-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--danger), var(--primary));
+}
+.guide-header h3 {
+  font-size: 1.25rem;
+  margin-bottom: 0.5rem;
+  color: var(--danger);
+}
+.guide-header p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin-bottom: 2rem;
+}
+.guide-steps {
+  display: grid;
+  gap: 1.5rem;
+}
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+.step p {
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.step a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+.step a:hover {
+  text-decoration: underline;
+}
+.step code {
+  background: rgba(255,255,255,0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
 .tagline{font-size:1rem;color:var(--text-secondary);max-width:400px;margin:0 auto}
 
 .glass-card{background:var(--glass-bg);backdrop-filter:blur(var(--glass-blur));-webkit-backdrop-filter:blur(var(--glass-blur));border:1px solid var(--glass-border);border-radius:var(--radius-lg);width:100%;transition:border-color var(--t-norm),box-shadow var(--t-norm)}
@@ -76,17 +169,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg-primary);color:var(--tex
 .dots::after{content:'';animation:dots 1.5s steps(4,end) infinite}
 @keyframes dots{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
 
-.cookies-badge{display:inline-block;margin-top:8px;padding:4px 12px;border-radius:var(--radius-sm);font-size:.75rem;font-weight:600;letter-spacing:.05em}
-.cookies-ok{background:rgba(34,197,94,.1);color:var(--success);border:1px solid rgba(34,197,94,.2)}
-.cookies-missing{background:rgba(239,68,68,.1);color:var(--error);border:1px solid rgba(239,68,68,.2)}
 
-.cookie-guide{width:100%;margin-top:24px;animation:fu .5s var(--ease) both}
-.guide-card{padding:30px 24px;display:flex;flex-direction:column;gap:12px;background:linear-gradient(to bottom right, rgba(18,18,26,0.8), rgba(30,30,40,0.8))}
-.guide-card h3{color:var(--warning);display:flex;align-items:center;gap:8px;font-size:1.1rem;margin-bottom:8px}
-.guide-card h3 svg{width:20px;height:20px}
-.guide-card p{color:var(--text-secondary);font-size:.9rem}
-.guide-card ol{color:var(--text-primary);font-size:.9rem;padding-left:24px;margin-top:8px;display:flex;flex-direction:column;gap:8px}
-.guide-card code{background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;font-family:monospace;color:var(--accent-2)}
 
 .error-section{width:100%;margin-top:24px}
 .error-card{padding:40px 24px;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center}

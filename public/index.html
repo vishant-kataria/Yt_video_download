@@ -34,9 +34,33 @@
         </div>
         <h1 class="logo-text">Tube<span>Grab</span></h1>
       </div>
-      <p class="tagline">Download YouTube videos in stunning quality — completely free.</p>
       <div id="cookies-badge" class="cookies-badge hidden"></div>
+      <p class="tagline">Download YouTube videos in stunning quality — completely free.</p>
     </header>
+
+    <!-- Cookie Guide -->
+    <section id="cookie-guide" class="cookie-guide hidden">
+      <div class="guide-card">
+        <div class="guide-header">
+          <h3>Authentication Required for High Quality</h3>
+          <p>YouTube is currently blocking high-quality (1080p/4K) downloads on your network. To bypass this, you need to provide your YouTube session cookies.</p>
+        </div>
+        <div class="guide-steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <p>Install the <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank">Get cookies.txt LOCALLY</a> extension on Chrome/Edge.</p>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <p>Open <a href="https://www.youtube.com" target="_blank">YouTube</a> and click the extension icon to export your cookies.</p>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <p>Save the file as <code>cookies.txt</code> exactly in this project folder: <br><strong>c:\PRSNL\Studies\coding\YT_video_download</strong></p>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- Search Section -->
     <section class="search-section" id="search-section">
@@ -61,20 +85,7 @@
       </div>
     </section>
 
-    <!-- Cookie Guide State -->
-    <section class="cookie-guide hidden" id="cookie-guide">
-      <div class="glass-card guide-card">
-        <h3><i data-lucide="info"></i> How to fix authentication</h3>
-        <p>YouTube requires authentication. To download videos, you need to provide a `cookies.txt` file.</p>
-        <ol>
-          <li>Install the "Get cookies.txt LOCALLY" extension in your browser (Chrome/Edge).</li>
-          <li>Go to youtube.com and log in.</li>
-          <li>Click the extension icon and click "Export".</li>
-          <li>Save the file as <code>cookies.txt</code> in the project root folder.</li>
-          <li>Restart the server.</li>
-        </ol>
-      </div>
-    </section>
+
 
     <!-- Loading State -->
     <section class="loading-section hidden" id="loading-section">

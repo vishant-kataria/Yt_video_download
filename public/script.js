@@ -27,24 +27,31 @@ let isLoading = false;
 // ── Init Lucide Icons ────────────────────────────────────────────────────
 lucide.createIcons();
 
-// ── Check cookies status on load ─────────────────────────────────────────
-(async function checkCookies() {
+// ── Check Cookies Status ─────────────────────────────────────────────────
+
+async function checkCookies() {
+  const badge = document.getElementById('cookies-badge');
+  const guide = document.getElementById('cookie-guide');
+  if (!badge || !guide) return;
+  
   try {
     const res = await fetch(`${API_BASE}/api/cookies-status`);
     const data = await res.json();
-    const badge = document.getElementById('cookies-badge');
-    if (badge) {
-      if (data.hasCookies) {
-        badge.textContent = '🍪 Cookies loaded';
-        badge.classList.add('cookies-ok');
-      } else {
-        badge.textContent = '⚠ No cookies.txt';
-        badge.classList.add('cookies-missing');
-      }
-      badge.classList.remove('hidden');
+    if (data.loaded) {
+      badge.textContent = 'Cookies Loaded';
+      badge.className = 'cookies-badge cookies-ok';
+      guide.classList.add('hidden');
+    } else {
+      badge.textContent = 'Cookies Missing';
+      badge.className = 'cookies-badge cookies-missing';
+      guide.classList.remove('hidden');
     }
-  } catch (e) { /* ignore */ }
-})();
+  } catch (err) {
+    console.error('Failed to check cookies:', err);
+  }
+}
+
+checkCookies();
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -66,9 +73,6 @@ function formatFileSize(bytes) {
 
 function showSection(section) {
   [loadingSection, errorSection, resultsSection].forEach(s => s.classList.add('hidden'));
-  // Also hide the cookie guide if showing results
-  const cookieGuide = document.getElementById('cookie-guide');
-  if (cookieGuide) cookieGuide.classList.add('hidden');
   if (section) section.classList.remove('hidden');
 }
 
@@ -91,15 +95,6 @@ async function fetchVideoInfo() {
     const data = await res.json();
 
     if (!res.ok) {
-      // Check if it's a cookies-needed error
-      if (data.needsCookies) {
-        showSection(errorSection);
-        errorText.innerHTML = data.error;
-        const cookieGuide = document.getElementById('cookie-guide');
-        if (cookieGuide) cookieGuide.classList.remove('hidden');
-        lucide.createIcons();
-        return;
-      }
       throw new Error(data.error || 'Failed to fetch video info.');
     }
 
