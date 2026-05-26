@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// TubeGrab — Frontend Logic
+// Vishant's YT Downloader — Frontend Logic
 // ═══════════════════════════════════════════════════════════════════════════
 
 const API_BASE = window.location.origin;

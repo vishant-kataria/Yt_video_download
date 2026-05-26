@@ -218,7 +218,7 @@ app.get('/api/download', async (req, res) => {
     const isAudio = format_id === 'bestaudio';
     const ext = isAudio ? 'mp3' : 'mp4';
 
-    const tempFilePath = path.join(os.tmpdir(), `tubegrab_${Date.now()}.${ext}`);
+    const tempFilePath = path.join(os.tmpdir(), `vishants_yt_${Date.now()}.${ext}`);
 
     // ── Build download args — again NO --extractor-args ──
     const args = ['--no-check-certificates', '--no-warnings'];
@@ -270,5 +270,5 @@ app.get('/api/download', async (req, res) => {
 // ── Start Server ─────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
-  console.log(`\n  🚀 TubeGrab running at http://localhost:${PORT}\n`);
+  console.log(`\n  🚀 Vishant's YT Downloader running at http://localhost:${PORT}\n`);
 });
